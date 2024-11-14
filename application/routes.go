@@ -25,17 +25,21 @@ func (a *App) loadRoutes() {
 }
 
 func (a *App) loadUserRoutes(router chi.Router) {
+	// userHandler := &handler.User{
+	// 	Repo: &user.RedisRepo{
+	// 		Client: a.rdb,
+	// 	},
+	// }
+
 	userHandler := &handler.User{
-		Repo: &user.RedisRepo{
-			Client: a.rdb,
-		},
+		Repo: user.NewPostgresRepo(a.db),
 	}
 
-	router.Post("/", userHandler.Create)                                   
-	router.Get("/", userHandler.List)                                      
-	// router.Get("/username/{username}", userHandler.GetByUsername)          
-	// router.Get("/displayname/{displayname}", userHandler.GetByDisplayName) 
-	router.Get("/{id}", userHandler.GetByID)                               
-	router.Put("/{id}", userHandler.UpdateByID)                            
-	router.Delete("/{id}", userHandler.DeleteByID)                         
+	router.Post("/", userHandler.Create)
+	router.Get("/", userHandler.List)
+	// router.Get("/username/{username}", userHandler.GetByUsername)
+	// router.Get("/displayname/{displayname}", userHandler.GetByDisplayName)
+	router.Get("/{id}", userHandler.GetByID)
+	router.Put("/{id}", userHandler.UpdateByID)
+	router.Delete("/{id}", userHandler.DeleteByID)
 }

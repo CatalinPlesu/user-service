@@ -16,7 +16,8 @@ import (
 )
 
 type User struct {
-	Repo *user.RedisRepo
+	// Repo *user.RedisRepo
+	Repo *user.PostgresRepo
 }
 
 func (h *User) Create(w http.ResponseWriter, r *http.Request) {
@@ -38,7 +39,7 @@ func (h *User) Create(w http.ResponseWriter, r *http.Request) {
 		Username:    body.Username,
 		DisplayName: body.DisplayName,
 		Email:       body.Email,
-		Password:    body.Password, // Note: You may want to hash passwords in practice
+		Password:    body.Password,
 		CreatedAt:   &now,
 		UpdatedAt:   &now,
 	}
@@ -131,9 +132,10 @@ func (h *User) GetByID(w http.ResponseWriter, r *http.Request) {
 
 func (h *User) UpdateByID(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		DisplayName       *string `json:"display_name,omitempty"`
-		Email             *string `json:"email,omitempty"`
-		ProfilePictureURL *string `json:"profile_picture_url,omitempty"`
+		Username    *string   `json:"username,omitempty"`
+		DisplayName *string   `json:"display_name,omitempty"`
+		Email       *string   `json:"email,omitempty"`
+		Password    *string   `json:"password,omitempty"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -160,11 +162,17 @@ func (h *User) UpdateByID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := time.Now().UTC()
+	if body.Username != nil {
+		theUser.Username = *body.Username
+	}
 	if body.DisplayName != nil {
 		theUser.DisplayName = *body.DisplayName
 	}
 	if body.Email != nil {
 		theUser.Email = *body.Email
+	}
+	if body.Password != nil {
+		theUser.Password = *body.Password
 	}
 	theUser.UpdatedAt = &now
 
