@@ -7,7 +7,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/CatalinPlesu/user-service/handler"
-	"github.com/CatalinPlesu/user-service/repository/order"
+	"github.com/CatalinPlesu/user-service/repository/user"
 )
 
 func (a *App) loadRoutes() {
@@ -19,21 +19,23 @@ func (a *App) loadRoutes() {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	router.Route("/orders", a.loadOrderRoutes)
+	router.Route("/users", a.loadUserRoutes)
 
 	a.router = router
 }
 
-func (a *App) loadOrderRoutes(router chi.Router) {
-	orderHandler := &handler.Order{
-		Repo: &order.RedisRepo{
+func (a *App) loadUserRoutes(router chi.Router) {
+	userHandler := &handler.User{
+		Repo: &user.RedisRepo{
 			Client: a.rdb,
 		},
 	}
 
-	router.Post("/", orderHandler.Create)
-	router.Get("/", orderHandler.List)
-	router.Get("/{id}", orderHandler.GetByID)
-	router.Put("/{id}", orderHandler.UpdateByID)
-	router.Delete("/{id}", orderHandler.DeleteByID)
+	router.Post("/", userHandler.Create)                                   
+	router.Get("/", userHandler.List)                                      
+	// router.Get("/username/{username}", userHandler.GetByUsername)          
+	// router.Get("/displayname/{displayname}", userHandler.GetByDisplayName) 
+	router.Get("/{id}", userHandler.GetByID)                               
+	router.Put("/{id}", userHandler.UpdateByID)                            
+	router.Delete("/{id}", userHandler.DeleteByID)                         
 }
