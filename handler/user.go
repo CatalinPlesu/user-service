@@ -11,13 +11,15 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"github.com/CatalinPlesu/user-service/messaging"
 	"github.com/CatalinPlesu/user-service/model"
 	"github.com/CatalinPlesu/user-service/repository/user"
 )
 
 type User struct {
 	// Repo *user.RedisRepo
-	Repo *user.PostgresRepo
+	Repo     *user.PostgresRepo
+	RabbitMQ *messaging.RabbitMQ
 }
 
 func (h *User) Create(w http.ResponseWriter, r *http.Request) {
@@ -48,6 +50,15 @@ func (h *User) Create(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		fmt.Println("failed to insert user:", err)
 		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	userID := user.UserID
+	jwt := "jwt-token"
+
+	err = h.RabbitMQ.PublishLoginRegisterMessage("user_login_register", userID, jwt)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to publish to RabbitMQ: %v", err), http.StatusInternalServerError)
 		return
 	}
 
@@ -132,10 +143,10 @@ func (h *User) GetByID(w http.ResponseWriter, r *http.Request) {
 
 func (h *User) UpdateByID(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Username    *string   `json:"username,omitempty"`
-		DisplayName *string   `json:"display_name,omitempty"`
-		Email       *string   `json:"email,omitempty"`
-		Password    *string   `json:"password,omitempty"`
+		Username    *string `json:"username,omitempty"`
+		DisplayName *string `json:"display_name,omitempty"`
+		Email       *string `json:"email,omitempty"`
+		Password    *string `json:"password,omitempty"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {

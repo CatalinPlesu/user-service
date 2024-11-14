@@ -12,16 +12,18 @@ type Config struct {
 	PostgresUser     string
 	PostgresPassword string
 	PostgresDB       string
+	RabitMQURL       string
 }
 
 func LoadConfig() Config {
 	cfg := Config{
+		ServerPort:       3000,
 		RedisAddress:     "localhost:6379",
 		PostgresAddress:  "localhost:5432",
 		PostgresUser:     "user",
 		PostgresPassword: "password",
 		PostgresDB:       "user_service_db",
-		ServerPort:       3000,
+		RabitMQURL:		  "amqp://guest:guest@localhost:5672/",
 	}
 
 	if redisAddr, exists := os.LookupEnv("REDIS_ADDR"); exists {
@@ -42,6 +44,10 @@ func LoadConfig() Config {
 
 	if postgresDB, exists := os.LookupEnv("POSTGRES_DB"); exists {
 		cfg.PostgresDB = postgresDB
+	}
+
+	if rabitMQURL, exists := os.LookupEnv("POSTGRES_DB"); exists {
+		cfg.RabitMQURL = rabitMQURL
 	}
 
 	if serverPort, exists := os.LookupEnv("SERVER_PORT"); exists {

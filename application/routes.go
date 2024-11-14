@@ -33,6 +33,7 @@ func (a *App) loadUserRoutes(router chi.Router) {
 
 	userHandler := &handler.User{
 		Repo: user.NewPostgresRepo(a.db),
+		RabbitMQ: a.rabbitMQ,
 	}
 
 	router.Post("/", userHandler.Create)

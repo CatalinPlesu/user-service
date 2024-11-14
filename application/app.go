@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/rabbitmq/amqp091-go"
+	"github.com/CatalinPlesu/user-service/messaging"
 	"github.com/redis/go-redis/v9"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
@@ -15,10 +15,11 @@ import (
 )
 
 type App struct {
-	router http.Handler
-	rdb    *redis.Client
-	db     *bun.DB
-	config Config
+	router   http.Handler
+	rdb      *redis.Client
+	db       *bun.DB
+	rabbitMQ *messaging.RabbitMQ
+	config   Config
 }
 
 func New(config Config) *App {
@@ -31,9 +32,12 @@ func New(config Config) *App {
 
 	db := bun.NewDB(sqlDB, pgdialect.New())
 
+	rabitMQ, _ := messaging.NewRabbitMQ(config.RabitMQURL)
+
 	app := &App{
 		rdb:    rdb,
 		db:     db,
+		rabbitMQ: rabitMQ,
 		config: config,
 	}
 
