@@ -35,10 +35,10 @@ func New(config Config) *App {
 	rabitMQ, _ := messaging.NewRabbitMQ(config.RabitMQURL)
 
 	app := &App{
-		rdb:    rdb,
-		db:     db,
+		rdb:      rdb,
+		db:       db,
 		rabbitMQ: rabitMQ,
-		config: config,
+		config:   config,
 	}
 
 	app.loadRoutes()
@@ -66,6 +66,9 @@ func (a *App) Start(ctx context.Context) error {
 		if err := a.rdb.Close(); err != nil {
 			fmt.Println("failed to close redis", err)
 		}
+		if err := a.db.Close(); err != nil {
+			fmt.Println("failed to close database", err)
+		}
 	}()
 
 	fmt.Println("Starting server")
@@ -89,6 +92,4 @@ func (a *App) Start(ctx context.Context) error {
 
 		return server.Shutdown(timeout)
 	}
-
-	return nil
 }
