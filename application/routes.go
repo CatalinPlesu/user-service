@@ -8,6 +8,7 @@ import (
 
 	"github.com/CatalinPlesu/user-service/handler"
 	"github.com/CatalinPlesu/user-service/repository/user"
+	"github.com/CatalinPlesu/user-service/repository/jwts"
 )
 
 func (a *App) loadRoutes() {
@@ -25,20 +26,18 @@ func (a *App) loadRoutes() {
 }
 
 func (a *App) loadUserRoutes(router chi.Router) {
-	// userHandler := &handler.User{
-	// 	Repo: &user.RedisRepo{
-	// 		Client: a.rdb,
-	// 	},
-	// }
-
 	userHandler := &handler.User{
-		Repo: user.NewPostgresRepo(a.db),
+		RdRepo: &jwts.RedisRepo{
+			Client: a.rdb,
+		},
+		PgRepo:   user.NewPostgresRepo(a.db),
 		RabbitMQ: a.rabbitMQ,
 	}
 
 	router.Get("/", userHandler.List)
 	router.Post("/register", userHandler.Register)
 	router.Post("/login", userHandler.Login)
+	router.Post("/auth", userHandler.Auth)
 	router.Get("/username/{username}", userHandler.GetByUsername)
 	router.Get("/displayname/{displayname}", userHandler.GetByDisplayName)
 	router.Get("/{id}", userHandler.GetByID)

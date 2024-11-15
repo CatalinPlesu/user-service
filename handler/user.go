@@ -13,12 +13,13 @@ import (
 
 	"github.com/CatalinPlesu/user-service/messaging"
 	"github.com/CatalinPlesu/user-service/model"
+	"github.com/CatalinPlesu/user-service/repository/jwts"
 	"github.com/CatalinPlesu/user-service/repository/user"
 )
 
 type User struct {
-	// Repo *user.RedisRepo
-	Repo     *user.PostgresRepo
+	RdRepo   *jwts.RedisRepo
+	PgRepo   *user.PostgresRepo
 	RabbitMQ *messaging.RabbitMQ
 }
 
@@ -46,7 +47,7 @@ func (h *User) Register(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt:   &now,
 	}
 
-	err := h.Repo.Insert(r.Context(), user)
+	err := h.PgRepo.Insert(r.Context(), user)
 	if err != nil {
 		fmt.Println("failed to insert user:", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -54,17 +55,34 @@ func (h *User) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userID := user.UserID
-	jwt := "jwt-token"
+	jwt, err := jwts.GenerateJWT(userID)
+	if err != nil {
+		fmt.Println("failed to generate jwt:", err)
+		return
+	}
+	err = h.RdRepo.Insert(r.Context(), user.UserID, jwt)
+	if err != nil {
+		fmt.Println("failed to insert user jwt:", err)
+		return
+	}
 
-	err = h.RabbitMQ.PublishLoginRegisterMessage("user_login_register", userID, jwt)
+	err = h.RabbitMQ.PublishLoginRegisterMessage("user_id_jwt", userID, jwt)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to publish to RabbitMQ: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	res, err := json.Marshal(user)
+	response := struct {
+		User    model.User `json:"user"`
+		UserJWT string     `json:"jwt"`
+	}{
+		User:    user,
+		UserJWT: jwt,
+	}
+
+	res, err := json.Marshal(response)
 	if err != nil {
-		fmt.Println("failed to marshal user:", err)
+		fmt.Println("failed to marshal response:", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -75,8 +93,8 @@ func (h *User) Register(w http.ResponseWriter, r *http.Request) {
 
 func (h *User) Login(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Username    string `json:"username"`
-		Password    string `json:"password"`
+		Username string `json:"username"`
+		Password string `json:"password"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -84,7 +102,7 @@ func (h *User) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	u, err := h.Repo.FindByUsername(r.Context(), body.Username)
+	u, err := h.PgRepo.FindByUsername(r.Context(), body.Username)
 	if errors.Is(err, user.ErrNotExist) {
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -94,7 +112,7 @@ func (h *User) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if (body.Password == u.Password) {
+	if body.Password == u.Password {
 		fmt.Println("Succes login")
 	} else {
 
@@ -107,25 +125,84 @@ func (h *User) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-
 	userID := u.UserID
-	jwt := "jwt-token"
+	jwt, err := jwts.GenerateJWT(userID)
+	if err != nil {
+		fmt.Println("failed to generate jwt:", err)
+		return
+	}
 
-	err = h.RabbitMQ.PublishLoginRegisterMessage("user_login_register", userID, jwt)
+	err = h.RdRepo.Insert(r.Context(), u.UserID, jwt)
+	if err != nil {
+		fmt.Println("failed to insert user jwt:", err)
+		return
+	}
+
+	err = h.RabbitMQ.PublishLoginRegisterMessage("user_id_jwt", userID, jwt)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to publish to RabbitMQ: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	res, err := json.Marshal(u)
+	response := struct {
+		User    model.User `json:"user"`
+		UserJWT string     `json:"jwt"`
+	}{
+		User:    *u,
+		UserJWT: jwt,
+	}
+
+	res, err := json.Marshal(response)
 	if err != nil {
-		fmt.Println("failed to marshal user:", err)
+		fmt.Println("failed to marshal response:", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusCreated)
 	w.Write(res)
+}
+
+func (h *User) Auth(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Username string `json:"username"`
+		JWT      string `json:"jwt"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	u, err := h.PgRepo.FindByUsername(r.Context(), body.Username)
+	if errors.Is(err, user.ErrNotExist) {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	} else if err != nil {
+		fmt.Println("failed to find user by username:", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	userID := u.UserID
+	claims, err := jwts.ValidateJWT(body.JWT)
+	if err != nil {
+		fmt.Println("bad jwt jwt:", err)
+		return
+	}
+
+	if claims.UserID != userID {
+		fmt.Println("bad jwt no acces or expierd")
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
 }
 
 func (h *User) List(w http.ResponseWriter, r *http.Request) {
@@ -143,7 +220,7 @@ func (h *User) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	const size = 50
-	res, err := h.Repo.FindAll(r.Context(), user.FindAllPage{
+	res, err := h.PgRepo.FindAll(r.Context(), user.FindAllPage{
 		Offset: cursor,
 		Size:   size,
 	})
@@ -179,7 +256,7 @@ func (h *User) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	u, err := h.Repo.FindByID(r.Context(), userID)
+	u, err := h.PgRepo.FindByID(r.Context(), userID)
 	if errors.Is(err, user.ErrNotExist) {
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -196,11 +273,10 @@ func (h *User) GetByID(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-
-func (h *User) GetByDisplayName (w http.ResponseWriter, r *http.Request) {
+func (h *User) GetByDisplayName(w http.ResponseWriter, r *http.Request) {
 	displayNameParam := chi.URLParam(r, "displayname")
- 
-	res, err := h.Repo.FindByDisplayName(r.Context(), displayNameParam)
+
+	res, err := h.PgRepo.FindByDisplayName(r.Context(), displayNameParam)
 	if err != nil {
 		fmt.Println("failed to find all users:", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -220,7 +296,7 @@ func (h *User) GetByDisplayName (w http.ResponseWriter, r *http.Request) {
 func (h *User) GetByUsername(w http.ResponseWriter, r *http.Request) {
 	usernameParam := chi.URLParam(r, "username")
 
-	u, err := h.Repo.FindByUsername(r.Context(), usernameParam)
+	u, err := h.PgRepo.FindByUsername(r.Context(), usernameParam)
 	if errors.Is(err, user.ErrNotExist) {
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -258,7 +334,7 @@ func (h *User) UpdateByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	theUser, err := h.Repo.FindByID(r.Context(), userID)
+	theUser, err := h.PgRepo.FindByID(r.Context(), userID)
 	if errors.Is(err, user.ErrNotExist) {
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -283,7 +359,7 @@ func (h *User) UpdateByID(w http.ResponseWriter, r *http.Request) {
 	}
 	theUser.UpdatedAt = &now
 
-	err = h.Repo.Update(r.Context(), theUser)
+	err = h.PgRepo.Update(r.Context(), theUser)
 	if err != nil {
 		fmt.Println("failed to update user:", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -306,7 +382,7 @@ func (h *User) DeleteByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.Repo.DeleteByID(r.Context(), userID)
+	err = h.PgRepo.DeleteByID(r.Context(), userID)
 	if errors.Is(err, user.ErrNotExist) {
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -316,11 +392,3 @@ func (h *User) DeleteByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
-
-// func (r *RedisRepo) FindByUsername(ctx context.Context, username string) (*model.User, error) {
-// 	// Implement the logic to query by username in Redis
-// }
-//
-// func (r *RedisRepo) FindByDisplayName(ctx context.Context, displayName string) (*model.User, error) {
-// 	// Implement the logic to query by display name in Redis
-// }

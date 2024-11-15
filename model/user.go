@@ -7,7 +7,6 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// User represents the user model which maps to the "users" table in PostgreSQL
 type User struct {
 	bun.BaseModel `bun:"table:users"` // Tells Bun to use the "users" table
 
@@ -18,4 +17,9 @@ type User struct {
 	Password    string     `bun:"password,notnull" json:"password"`
 	CreatedAt   *time.Time `bun:"created_at,notnull,default:current_timestamp" json:"created_at"`
 	UpdatedAt   *time.Time `bun:"updated_at,notnull,default:current_timestamp" json:"updated_at"`
+}
+
+type UserJWTs struct {
+	UserID uuid.UUID `json:"user_id"`
+	JWTs   []string  `json:"jwts"`
 }
