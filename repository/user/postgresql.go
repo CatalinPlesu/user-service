@@ -46,6 +46,15 @@ func (p *PostgresRepo) FindByID(ctx context.Context, id uuid.UUID) (*model.User,
 	return &user, nil
 }
 
+func (p *PostgresRepo) FindByUsername(ctx context.Context, username string) (*model.User, error) {
+	var user model.User
+	err := p.DB.NewSelect().Model(&user).Where("username = ?", username).Scan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find user by ID: %w", err)
+	}
+	return &user, nil
+}
+
 func (p *PostgresRepo) DeleteByID(ctx context.Context, id uuid.UUID) error {
 	_, err := p.DB.NewDelete().Model((*model.User)(nil)).Where("user_id = ?", id).Exec(ctx)
 	if err != nil {
@@ -67,6 +76,24 @@ type UserPage struct {
 	Cursor uint64
 }
 
+func (r *PostgresRepo) FindByDisplayName(ctx context.Context, displayName string) ([]model.User, error) {
+	var users []model.User
+
+	// Query the database for users
+	query := r.DB.NewSelect().
+		Model(&users).
+		Where("display_name ILIKE ?", "%"+displayName+"%").
+		Order("user_id ASC").
+		Limit(10)
+
+	// Execute the query
+	err := query.Scan(ctx)
+	if err != nil {
+		return users, fmt.Errorf("failed to retrieve users: %w", err)
+	}
+
+	return users, nil
+}
 
 func (r *PostgresRepo) FindAll(ctx context.Context, page FindAllPage) (UserPage, error) {
 	var users []model.User
@@ -98,6 +125,6 @@ func (r *PostgresRepo) FindAll(ctx context.Context, page FindAllPage) (UserPage,
 
 	return UserPage{
 		Users:  users,
-		Cursor: page.Size+50,
+		Cursor: page.Size + 50,
 	}, nil
 }

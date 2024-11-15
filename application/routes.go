@@ -36,10 +36,11 @@ func (a *App) loadUserRoutes(router chi.Router) {
 		RabbitMQ: a.rabbitMQ,
 	}
 
-	router.Post("/", userHandler.Create)
 	router.Get("/", userHandler.List)
-	// router.Get("/username/{username}", userHandler.GetByUsername)
-	// router.Get("/displayname/{displayname}", userHandler.GetByDisplayName)
+	router.Post("/register", userHandler.Register)
+	router.Post("/login", userHandler.Login)
+	router.Get("/username/{username}", userHandler.GetByUsername)
+	router.Get("/displayname/{displayname}", userHandler.GetByDisplayName)
 	router.Get("/{id}", userHandler.GetByID)
 	router.Put("/{id}", userHandler.UpdateByID)
 	router.Delete("/{id}", userHandler.DeleteByID)
