@@ -46,7 +46,7 @@ func LoadConfig() Config {
 		cfg.PostgresDB = postgresDB
 	}
 
-	if rabitMQURL, exists := os.LookupEnv("POSTGRES_DB"); exists {
+	if rabitMQURL, exists := os.LookupEnv("RABITMQ_URL"); exists {
 		cfg.RabitMQURL = rabitMQURL
 	}
 
