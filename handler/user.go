@@ -117,6 +117,8 @@ func (h *User) Login(w http.ResponseWriter, r *http.Request) {
 	} else {
 
 		fmt.Println("fail login")
+		w.WriteHeader(http.StatusNotFound)
+		return
 	}
 
 	if err := json.NewEncoder(w).Encode(u); err != nil {
