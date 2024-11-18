@@ -115,15 +115,8 @@ func (h *User) Login(w http.ResponseWriter, r *http.Request) {
 	if body.Password == u.Password {
 		fmt.Println("Succes login")
 	} else {
-
 		fmt.Println("fail login")
 		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-
-	if err := json.NewEncoder(w).Encode(u); err != nil {
-		fmt.Println("failed to marshal user:", err)
-		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
@@ -139,13 +132,13 @@ func (h *User) Login(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("failed to insert user jwt:", err)
 		return
 	}
-
+	
 	err = h.RabbitMQ.PublishLoginRegisterMessage("user_id_jwt", userID, jwt)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to publish to RabbitMQ: %v", err), http.StatusInternalServerError)
 		return
 	}
-
+	
 	response := struct {
 		User    model.User `json:"user"`
 		UserJWT string     `json:"jwt"`
@@ -153,7 +146,7 @@ func (h *User) Login(w http.ResponseWriter, r *http.Request) {
 		User:    *u,
 		UserJWT: jwt,
 	}
-
+	
 	res, err := json.Marshal(response)
 	if err != nil {
 		fmt.Println("failed to marshal response:", err)
