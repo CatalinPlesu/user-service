@@ -197,7 +197,16 @@ func (h *User) Auth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+
+	res, err := json.Marshal(u)
+	if err != nil {
+		fmt.Println("failed to marshal response:", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
 	w.WriteHeader(http.StatusCreated)
+	w.Write(res)
 }
 
 func (h *User) List(w http.ResponseWriter, r *http.Request) {
